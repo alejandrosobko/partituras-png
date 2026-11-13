@@ -18,7 +18,12 @@ async function fetchSource(page) {
       ? 'el link venció; volvé a tocar el botón en la partitura'
       : `error ${response.status}`);
   }
-  return page.ext === 'svg' ? { ext: 'svg', text: await response.text() } : { ext: 'png', blob: await response.blob() };
+  if (page.ext === 'svg') return { ext: 'svg', text: await response.text() };
+  const blob = await response.blob();
+  const bitmap = await createImageBitmap(blob);
+  const source = { ext: 'png', blob, naturalWidth: bitmap.width, naturalHeight: bitmap.height };
+  bitmap.close();
+  return source;
 }
 
 function buildCard(page) {
@@ -34,7 +39,6 @@ function buildCard(page) {
 async function renderAll() {
   const width = Math.round(Number($('width').value));
   if (!width || width < 200 || width > 6000) return;
-  $('downloadAll').disabled = true;
   for (const page of pages) {
     if (!page.source) continue;
     try {
@@ -48,15 +52,36 @@ async function renderAll() {
       page.card.querySelector('span').textContent = `Página ${page.n + 1}: ${error.message}`;
     }
   }
-  $('downloadAll').disabled = !pages.some((p) => p.png);
+}
+
+async function saveBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  await chrome.downloads.download({ url, filename });
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 async function download(page) {
   if (!page.png) return;
-  const url = URL.createObjectURL(page.png.blob);
   const name = safeName(title);
-  await chrome.downloads.download({ url, filename: `${name}/${name} - p${page.n + 1}.png` });
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  await saveBlob(page.png.blob, `${name}/${name} - p${page.n + 1}.png`);
+}
+
+async function downloadPdf() {
+  const button = $('downloadPdf');
+  const ready = pages.filter((p) => p.source);
+  if (!ready.length) return;
+  button.disabled = true;
+  try {
+    const pdf = await renderPdf(ready.map((p) => p.source), title, (i, total) => {
+      button.textContent = `Generando PDF ${i}/${total}…`;
+    });
+    await saveBlob(pdf, `${safeName(title)}.pdf`);
+  } catch (error) {
+    setStatus(`No pude generar el PDF: ${error.message}`, true);
+  } finally {
+    button.textContent = 'Descargar PDF';
+    button.disabled = false;
+  }
 }
 
 async function init() {
@@ -100,8 +125,6 @@ async function init() {
 }
 
 $('width').addEventListener('change', renderAll);
-$('downloadAll').addEventListener('click', async () => {
-  for (const page of pages) await download(page);
-});
+$('downloadPdf').addEventListener('click', downloadPdf);
 
 init();

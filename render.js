@@ -1,8 +1,11 @@
-// Convierte una página (SVG o PNG) a PNG del ancho pedido.
+// Convierte una página (SVG o PNG) a imagen del ancho pedido.
 // El SVG se re-dimensiona antes de rasterizar: el navegador lo dibuja directo a ese tamaño
 // (en vez de achicar una imagen gigante, que es lo que lo dejaba feo).
 
-function sizeSvg(svgText, width) {
+// MuseScore exporta los SVG a 360 px por pulgada (Carta = 3060 px de ancho).
+const MUSESCORE_SVG_DPI = 360;
+
+function parseSvg(svgText) {
   const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
   const svg = doc.documentElement;
   if (svg.nodeName !== 'svg') throw new Error('El archivo no es un SVG válido');
@@ -16,11 +19,16 @@ function sizeSvg(svgText, width) {
     svg.setAttribute('viewBox', viewBox);
   }
   const [, , vbWidth, vbHeight] = viewBox.trim().split(/[\s,]+/).map(Number);
-  const height = Math.round((width * vbHeight) / vbWidth);
-  svg.setAttribute('width', String(width));
-  svg.setAttribute('height', String(height));
-  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-  return { text: new XMLSerializer().serializeToString(svg), width, height };
+  return { svg, vbWidth, vbHeight };
+}
+
+// Tamaño natural de la página (en px de origen).
+function pageNaturalSize(source) {
+  if (source.ext === 'svg') {
+    const { vbWidth, vbHeight } = parseSvg(source.text);
+    return { width: vbWidth, height: vbHeight, dpi: MUSESCORE_SVG_DPI };
+  }
+  return { width: source.naturalWidth, height: source.naturalHeight, dpi: null };
 }
 
 function loadImage(blob) {
@@ -36,14 +44,17 @@ function loadImage(blob) {
   });
 }
 
-// source: { ext: 'svg', text } | { ext: 'png', blob }
-async function renderPagePng(source, width) {
+// source: { ext: 'svg', text } | { ext: 'png', blob, naturalWidth, naturalHeight }
+async function renderPageCanvas(source, width) {
   let blob;
   let height;
   if (source.ext === 'svg') {
-    const sized = sizeSvg(source.text, width);
-    blob = new Blob([sized.text], { type: 'image/svg+xml' });
-    height = sized.height;
+    const { svg, vbWidth, vbHeight } = parseSvg(source.text);
+    height = Math.round((width * vbHeight) / vbWidth);
+    svg.setAttribute('width', String(width));
+    svg.setAttribute('height', String(height));
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    blob = new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml' });
   } else {
     blob = source.blob;
   }
@@ -59,9 +70,14 @@ async function renderPagePng(source, width) {
     ctx.fillRect(0, 0, width, height);
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(img, 0, 0, width, height);
-    const png = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-    return { blob: png, width, height };
+    return canvas;
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+async function renderPagePng(source, width) {
+  const canvas = await renderPageCanvas(source, width);
+  const png = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  return { blob: png, width: canvas.width, height: canvas.height };
 }
