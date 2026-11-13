@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Partitura a PNG</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #f6f6f4; --card: #fff; --text: #1d1d1b; --muted: #6b6b66; --line: #e2e2dc; --accent: #2b6cb0; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #1b1b1a; --card: #262624; --text: #ecebe6; --muted: #a3a29b; --line: #3a3a37; --accent: #6ea8e8; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.45 system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+    main { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .muted { color: var(--muted); }
+    .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 20px 0; }
+    label { display: flex; gap: 8px; align-items: center; }
+    input[type=number] { width: 96px; padding: 6px 8px; font: inherit; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--text); }
+    button { font: inherit; padding: 7px 14px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+    button.secondary { background: transparent; color: var(--accent); }
+    button:disabled { opacity: .5; cursor: default; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+    .page { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .page img { width: 100%; background: #fff; border: 1px solid var(--line); }
+    .page .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .error { color: #c53030; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1 id="title">Partitura</h1>
+    <div id="status" class="muted">Cargando…</div>
+    <div class="bar" id="bar" hidden>
+      <label>Ancho <input id="width" type="number" min="200" max="6000" step="100" value="1200"> px</label>
+      <button id="downloadAll">Descargar todas</button>
+    </div>
+    <div class="grid" id="grid"></div>
+  </main>
+  <script src="render.js"></script>
+  <script src="results.js"></script>
+</body>
+</html>
